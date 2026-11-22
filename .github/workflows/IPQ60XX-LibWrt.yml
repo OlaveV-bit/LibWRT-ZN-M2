@@ -124,6 +124,16 @@ jobs:
         make defconfig
         make download -j$(nproc)
 
+    - name: Verify Feature Config(校验关键配置)
+      run: |
+        cd $OPENWRT_PATH
+        echo "---------------- 无线相关（应全部为未启用） ----------------"
+        grep -E 'CONFIG_PACKAGE_(kmod-ath11k|kmod-mac80211|kmod-cfg80211|wpad|hostapd|wpa-supplicant|ath11k-firmware-ipq6018)=y' .config && { echo "[ERR] 仍启用了无线组件"; exit 1; } || echo "OK：无无线组件"
+        echo "---------------- 设备选择 ----------------"
+        grep -E 'CONFIG_TARGET_DEVICE_qualcommax_ipq60xx_DEVICE_zn_m2=y' .config || { echo "[ERR] 未选中 zn_m2 设备"; exit 1; }
+        echo "---------------- USB3.0 支持 ----------------"
+        grep -E 'CONFIG_PACKAGE_kmod-usb3=y|CONFIG_PACKAGE_kmod-usb-dwc3-qcom=y|CONFIG_PACKAGE_kmod-usb-storage=y' .config || { echo "[ERR] USB3.0 相关包未启用"; exit 1; }
+
     - name: Compile Firmware(开始编译固件)
       id: compile
       run: |
@@ -161,14 +171,15 @@ jobs:
         token: ${{ secrets.GITHUB_TOKEN }}
         artifacts: ${{ env.FIRMWARE_PATH }}/*
         body: |
-          **This is OpenWrt Firmware for ZN-M2 (Qualcomm IPQ60XX)**
+          **This is OpenWrt Firmware for ZN-M2 (Qualcomm IPQ60XX) — 无 WiFi / 1GB 内存 / USB3.0 版本**
           ### 📒 固件信息
-          - 针对 **兆能 ZN-M2** 深度定制 NSS 6.12 内核固件。
+          - 针对 **兆能 ZN-M2（硬件魔改：1GB 内存 + 加装 USB3.0/USB 供电）** 定制 NSS 6.12 内核固件。
+          - 🚫 **无 WiFi**：未编译 ath11k / cfg80211 / mac80211 / hostapd / wpad，设备树中无线节点已置为 disabled。
+          - 🧠 **1GB 内存**：设备树显式声明 1GB（0x40000000~0x80000000），不再受 512MB 限制。
+          - 🔌 **USB3.0**：DWC3 控制器与 PHY 已使能，含 USB 存储/UASP 及 ext4、f2fs、vfat、exfat、ntfs3 支持。
           - 🌐 默认地址: **192.168.2.1**
           - 🔑 默认密码: **none**
-          - 🚀 核心更新：**OpenClash**。
-          - 🧹 稳定性已优化。
-          - 🛠️ 包含插件：cpufreq, upnp, ddns, diskman。
+          - 🚀 核心插件：**OpenClash**、cpufreq、upnp、ddns、diskman。
           ### 🧊 固件版本
           - 固件内核版本：**${{ env.VERSION_KERNEL }}**
           - ${{ env.VERSION_INFO }}
